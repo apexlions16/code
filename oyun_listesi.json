@@ -11,11 +11,12 @@
     ],
     "executable_name": "PapersPlease.exe",
     "archive_type": "rar",
+    "play_action": "https://store.steampowered.com/app/239030/Papers_Please/"
   },
   {
     "id": "Grand Theft Auto 1",
     "name": "Grand Theft Auto 1",
-    "description": "Grand Theft Auto 1 (GTA 1), 1997 yılında DMA Design (şimdiki Rockstar North) tarafından geliştirilen ve Rockstar Games tarafından yayımlanan, açık dünya türünde bir aksiyon oyunudur. Oyuncu, Liberty City, San Andreas ve Vice City adlı üç farklı şehirde suç dünyasında yükselmeye çalışan bir karakteri kontrol eder. Kuşbakışı (üstten) kamera açısıyla oynanan GTA 1, görevlerle para kazanma, araç çalma ve serbest dolaşım gibi unsurlarıyla oyun dünyasında büyük etki yaratmış ve GTA serisinin temelini atmıştır.",
+    "description": "....",
     "logo_url": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/12170/logo_2x.png",
     "background_url": "",
     "download_parts": [
@@ -23,6 +24,7 @@
       "https://gamebuild.launcher.xsolla.com/20578/full_games/full_game_/full_game_7734b57b9ab00a8d6e8d1d63275c4810_.7z.002"
     ],
     "executable_name": "GTA.exe",
-    "archive_type": "rar",
+    "archive_type": "zip",
+    "play_action": "https://www.tamindir.com/indir/grand-theft-auto/"
   }
 ]
