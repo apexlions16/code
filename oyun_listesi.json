@@ -12,21 +12,19 @@
     "executable_name": "PapersPlease.exe",
     "archive_type": "rar",
     "play_action": "https://store.steampowered.com/app/239030/Papers_Please/"
-  }
-]
-[
+  },
   {
-    "id": "Grand Theft Auto",
-    "name": "Grand Theft Auto",
-    "description": "Amerika'nın en zorlu üç şehrinde onlarca farklı aracı kullanın.",
-    "logo_url": "",
-    "background_url": "",
+    "id": "GTA 1",
+    "name": "Grand Theft Auto 1",
+    "description": "1997 yapımı, üstten görünüşlü aksiyon-macera oyunu. Suç dünyasında yükselmek için görevleri tamamla.",
+    "logo_url": "https://www.tamindir.com/indir/grand-theft-auto/",
+    "background_url": "https://www.tamindir.com/indir/grand-theft-auto/",
     "download_parts": [
-      "https://gamebuild.launcher.xsolla.com/20565/full_games/full_game_/full_game_8622b6f1f5a336ca8edbefad6f01b711_.7z.001",
-      "https://gamebuild.launcher.xsolla.com/20565/full_games/full_game_/full_game_8622b6f1f5a336ca8edbefad6f01b711_.7z.002"
+      "https://gamebuild.launcher.xsolla.com/20578/full_games/full_game_/full_game_7734b57b9ab00a8d6e8d1d63275c4810_.7z.001",
+      "https://gamebuild.launcher.xsolla.com/20578/full_games/full_game_/full_game_7734b57b9ab00a8d6e8d1d63275c4810_.7z.002"
     ],
-    "executable_name": "DOSBOX.EXE",
-    "archive_type": "rar",
-    "play_action": ""
+    "executable_name": "GTA.exe",
+    "archive_type": "zip",
+    "play_action": "https://www.tamindir.com/indir/grand-theft-auto/"
   }
 ]
