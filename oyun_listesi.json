@@ -3,8 +3,8 @@
     "id": "!Time Lock VR!",
     "name": "!Time Lock VR!",
     "description": "....",
-    "logo_url": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/239030/logo_2x.png",
-    "background_url": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/239030/page_bg_raw.jpg?t=1678266428",
+    "logo_url": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/673450/logo_2x.png",
+    "background_url": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/673450/page_bg_raw.jpg?t=1746538262",
     "download_parts": [
       "https://gamebuild.launcher.xsolla.com/20565/full_games/full_game_/full_game_8622b6f1f5a336ca8edbefad6f01b711_.7z.001",
       "https://gamebuild.launcher.xsolla.com/20565/full_games/full_game_/full_game_8622b6f1f5a336ca8edbefad6f01b711_.7z.002"
@@ -17,8 +17,8 @@
     "id": "Grand Theft Auto 1",
     "name": "Grand Theft Auto 1",
     "description": "....",
-    "logo_url": "https://www.tamindir.com/indir/grand-theft-auto/",
-    "background_url": "https://www.tamindir.com/indir/grand-theft-auto/",
+    "logo_url": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/12170/logo_2x.png",
+    "background_url": "",
     "download_parts": [
       "https://gamebuild.launcher.xsolla.com/20578/full_games/full_game_/full_game_7734b57b9ab00a8d6e8d1d63275c4810_.7z.001",
       "https://gamebuild.launcher.xsolla.com/20578/full_games/full_game_/full_game_7734b57b9ab00a8d6e8d1d63275c4810_.7z.002"
