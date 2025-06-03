@@ -3,8 +3,6 @@
     "id": "!Time Lock VR!",
     "name": "!Time Lock VR!",
     "description": "....",
-    "logo_url": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/673450/logo_2x.png",
-    "background_url": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/673450/page_bg_raw.jpg?t=1746538262",
     "download_parts": [
       "https://gamebuild.launcher.xsolla.com/20565/full_games/full_game_/full_game_8622b6f1f5a336ca8edbefad6f01b711_.7z.001",
       "https://gamebuild.launcher.xsolla.com/20565/full_games/full_game_/full_game_8622b6f1f5a336ca8edbefad6f01b711_.7z.002"
@@ -17,8 +15,6 @@
     "id": "Grand Theft Auto 1",
     "name": "Grand Theft Auto 1",
     "description": "....",
-    "logo_url": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/12170/logo_2x.png",
-    "background_url": "",
     "download_parts": [
       "https://gamebuild.launcher.xsolla.com/20578/full_games/full_game_/full_game_7734b57b9ab00a8d6e8d1d63275c4810_.7z.001",
       "https://gamebuild.launcher.xsolla.com/20578/full_games/full_game_/full_game_7734b57b9ab00a8d6e8d1d63275c4810_.7z.002"
@@ -26,18 +22,16 @@
     "executable_name": "GTA.exe",
     "archive_type": "zip",
     "play_action": "https://www.tamindir.com/indir/grand-theft-auto/"
-  }
+  },
   {
     "id": "Papers, Please",
     "name": "Papers, Please",
     "description": "....",
-    "logo_url": "",
-    "background_url": "",
     "download_parts": [
       "https://gamebuild.launcher.xsolla.com/20580/full_games/full_game_/full_game_6e51eaa103f247b42e398d5ab4b1faab_.7z.001"
     ],
     "executable_name": "PapersPlease.exe",
     "archive_type": "rar",
     "play_action": "https://store.steampowered.com/app/239030/Papers_Please/"
-  },
+  }
 ]
