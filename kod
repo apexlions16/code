@@ -1,0 +1,776 @@
+import requests
+import os
+import shutil
+import json
+import subprocess
+from tkinter import filedialog, Tk, Label, Button, Listbox, Scrollbar, END, messagebox, Frame, Text, PhotoImage
+from tkinter import ttk
+import sys
+import threading
+import time
+import re
+from PIL import Image, ImageTk # PIL (Pillow) kütüphanesini içe aktar
+
+# JSON dosyasının GitHub'daki ham (raw) içeriği URL'si
+JSON_URL = "https://raw.githubusercontent.com/apexlions16/code/main/oyun_listesi.json"
+
+# WinRAR uygulamasının yolu (başlangıçta None olarak ayarlanır, uygulama arayacaktır)
+WINRAR_PATH = None
+
+# Global değişkenler (GUI içinde erişim için)
+all_games = []
+filtered_games_for_download = []
+status_text_widget = None
+root_window = None
+download_base_directory = ""
+progress_bar_widget = None
+progress_label_widget = None
+download_button_widget = None
+manual_winrar_button_widget = None
+game_image_label = None # Oyun resmini göstermek için yeni Label
+current_game_image = None # Çöp toplamayı önlemek için PhotoImage referansı
+
+# Toplam indirilen boyutu ve toplam oyun boyutunu tutmak için global değişkenler
+cumulative_downloaded_size = [0]
+total_game_download_size = [0]
+
+def update_status(message):
+    """GUI'deki durum mesajını günceller ve konsola yazdırır."""
+    global status_text_widget
+    if status_text_widget:
+        root_window.after(0, _update_status_gui, message)
+    print(message)
+
+def _update_status_gui(message):
+    """GUI'deki durum mesajını günceller (ana thread'de çalışır)."""
+    status_text_widget.config(state="normal")
+    status_text_widget.insert(END, message + "\n")
+    status_text_widget.see(END)
+    status_text_widget.config(state="disabled")
+
+def update_progress_gui(value, text):
+    """GUI'deki ilerleme çubuğunu ve metnini günceller (ana thread'de çalışır)."""
+    global progress_bar_widget, progress_label_widget
+    if progress_bar_widget and progress_label_widget:
+        progress_bar_widget['value'] = value
+        progress_label_widget.config(text=text)
+
+def find_executable(executable_name):
+    """
+    Belirtilen yürütülebilir dosyayı sistem PATH'inde ve yaygın kurulum dizinlerinde arar.
+    Bulursa tam yolu, aksi takdirde None döndürür.
+    Bu versiyon, konsola veya GUI'ye çıktı vermez.
+    """
+    for path_dir in os.environ["PATH"].split(os.pathsep):
+        full_path = os.path.join(path_dir, executable_name)
+        if sys.platform == "win32" and not full_path.lower().endswith((".exe", ".bat", ".cmd")):
+            full_path += ".exe"
+        if os.path.exists(full_path) and os.path.isfile(full_path):
+            return full_path
+
+    common_install_dirs = []
+    if sys.platform == "win32":
+        for drive_letter in "CDEFGHIJKLMNOPQRSTUVWXYZ":
+            drive_path = f"{drive_letter}:\\"
+            if os.path.exists(drive_path):
+                common_install_dirs.append(os.path.join(drive_path, "Program Files"))
+                common_install_dirs.append(os.path.join(drive_path, "Program Files (x86)"))
+        
+        if "winrar" in executable_name.lower() or "rar" in executable_name.lower():
+            for base_dir in list(common_install_dirs):
+                common_install_dirs.append(os.path.join(base_dir, "WinRAR"))
+    elif sys.platform == "darwin":
+        common_install_dirs.extend([
+            "/Applications",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/opt/local/bin"
+        ])
+    else:
+        common_install_dirs.extend([
+            "/usr/local/bin",
+            "/usr/bin",
+            "/opt",
+            "/snap/bin"
+        ])
+
+    for base_dir in common_install_dirs:
+        full_path = os.path.join(base_dir, executable_name)
+        if os.path.exists(full_path) and os.path.isfile(full_path):
+            return full_path
+    
+    return None
+
+def fetch_games(url):
+    """
+    Belirtilen URL'den JSON oyun verilerini çeker ve isme göre alfabetik olarak sıralar.
+    """
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        games_data = response.json()
+        sorted_games = sorted(games_data, key=lambda x: x['name'].lower())
+        return sorted_games
+    except requests.exceptions.RequestException as e:
+        update_status(f"Hata: Oyun verileri çekilirken bir ağ hatası oluştu: {e}")
+        return None
+    except json.JSONDecodeError as e:
+        update_status(f"Hata: Çekilen veri geçerli bir JSON değil: {e}")
+        return None
+
+def select_download_directory_gui():
+    """
+    Kullanıcıdan indirme klasörünü seçmesini ister ve seçilen yolu döndürür.
+    GUI'den çağrılır.
+    """
+    global download_base_directory
+    update_status("Lütfen oyunları indirmek için bir klasör seçin...")
+    selected_dir = filedialog.askdirectory(
+        title="Oyunları İndirmek İçin Klasör Seçin"
+    )
+    if not selected_dir:
+        update_status("İndirme klasörü seçilmedi.")
+        download_base_directory = ""
+    else:
+        download_base_directory = selected_dir
+        update_status(f"İndirme klasörü seçildi: {download_base_directory}")
+    return download_base_directory
+
+def download_file(url, destination_path, game_name, part_number, total_parts_count):
+    """
+    Belirtilen URL'den dosyayı indirir ve belirtilen yola kaydeder.
+    İlerleme çubuğunu ve hızı günceller.
+    """
+    try:
+        update_status(f"'{game_name}' indiriliyor (Part {part_number}/{total_parts_count})...")
+        
+        download_start_time = time.time()
+        downloaded_bytes_for_speed = 0
+        
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(destination_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    cumulative_downloaded_size[0] += len(chunk)
+                    downloaded_bytes_for_speed += len(chunk)
+                    
+                    current_time = time.time()
+                    total_elapsed_time = current_time - download_start_time
+                    
+                    speed_kbps = 0
+                    if total_elapsed_time > 0:
+                        speed_kbps = (downloaded_bytes_for_speed / 1024) / total_elapsed_time
+
+                    if total_game_download_size[0] > 0:
+                        overall_progress = int((cumulative_downloaded_size[0] / total_game_download_size[0]) * 100)
+                        root_window.after(0, update_progress_gui, overall_progress, 
+                                          f"{cumulative_downloaded_size[0] / (1024*1024):.2f} MB / {total_game_download_size[0] / (1024*1024):.2f} MB ({overall_progress}%) - {speed_kbps:.1f} KB/s")
+        update_status(f"'{game_name}' için Part {part_number}/{total_parts_count} başarıyla indirildi.")
+        return True
+    except requests.exceptions.RequestException as e:
+        update_status(f"Hata: '{game_name}' için Part {part_number}/{total_parts_count} indirilirken bir ağ hatası oluştu: {e}")
+        root_window.after(0, update_progress_gui, 0, "0%")
+        return False
+    except IOError as e:
+        update_status(f"Hata: '{game_name}' için Part {part_number}/{total_parts_count} kaydedilirken bir hata oluştu: {e}")
+        root_window.after(0, update_progress_gui, 0, "0%")
+        return False
+
+def merge_parts(download_dir, game_info, downloaded_part_paths):
+    """
+    İndirilen parçalı dosyaları tek bir arşiv dosyasına birleştirir.
+    Dönüş değeri: Birleştirilen dosyanın tam yolu veya None.
+    """
+    game_name = game_info['name']
+    update_status(f"'{game_name}' oyununun parçaları birleştiriliyor...")
+    
+    base_name_for_merged = os.path.splitext(game_info.get('executable_name', game_info['id']))[0]
+    merged_filename_temp = f"{base_name_for_merged}_merged_archive_temp"
+
+    merged_filepath = os.path.join(download_dir, merged_filename_temp)
+
+    try:
+        with open(merged_filepath, 'wb') as outfile:
+            for part_path in downloaded_part_paths:
+                with open(part_path, 'rb') as infile:
+                    shutil.copyfileobj(infile, outfile)
+        update_status(f"Parçalar başarıyla birleştirildi: {os.path.basename(merged_filepath)}")
+
+        if sys.platform == "win32":
+            try:
+                subprocess.run(['attrib', '+H', merged_filepath], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                update_status(f"'{os.path.basename(merged_filepath)}' dosyası gizlendi.")
+                time.sleep(0.05)
+            except Exception as e:
+                update_status(f"Uyarı: '{os.path.basename(merged_filepath)}' gizlenirken hata oluştu: {e}")
+
+        return merged_filepath
+    except Exception as e:
+        update_status(f"Hata: Parçalar birleştirilirken bir sorun oluştu: {e}")
+        return None
+
+def extract_archive(archive_path_no_ext, extract_dir, archive_type):
+    """
+    Arşiv dosyasını belirtilen dizine çıkarır.
+    WinRAR (rar.exe/WinRAR.exe) gibi harici bir aracı kullanır.
+    İlerleme çubuğunu güncelleyerek pencereyi gizler.
+    archive_path_no_ext: Uzantısız geçici arşiv dosyasının yolu.
+    Dönüş değeri: Başarılı olursa geçici uzantılı arşivin yolu (silinmesi için), aksi halde None.
+    """
+    update_status(f"Arşiv çıkarılıyor: {os.path.basename(archive_path_no_ext)} (WinRAR penceresi gizli)...")
+    root_window.after(0, update_progress_gui, 0, "Çıkarılıyor...")
+
+    extraction_tool_path = None
+    command = []
+    
+    temp_archive_name_with_ext = f"{os.path.basename(archive_path_no_ext)}.{archive_type}" if archive_type else f"{os.path.basename(archive_path_no_ext)}.rar"
+    temp_archive_path_with_ext = os.path.join(os.path.dirname(archive_path_no_ext), temp_archive_name_with_ext)
+
+    try:
+        os.rename(archive_path_no_ext, temp_archive_path_with_ext)
+        update_status(f"Arşiv geçici olarak yeniden adlandırıldı: {os.path.basename(temp_archive_path_with_ext)}")
+    except Exception as e:
+        update_status(f"Hata: Arşiv yeniden adlandırılamadı: {e}")
+        root_window.after(0, update_progress_gui, 0, "Hata")
+        return None
+
+    if WINRAR_PATH:
+        extraction_tool_path = WINRAR_PATH
+        command = [extraction_tool_path, "x", temp_archive_path_with_ext, extract_dir]
+    
+    if not extraction_tool_path:
+        error_msg = f"Hata: WinRAR çıkarma aracı bulunamadı.\n" \
+                            f"Lütfen WinRAR'ın kurulu olduğundan ve PATH'inizde olduğundan veya " \
+                            f"betikteki yolun doğru ayarlandığından emin olun."
+        update_status(error_msg)
+        root_window.after(0, messagebox.showerror, "Çıkarma Aracı Hatası", error_msg)
+        root_window.after(0, update_progress_gui, 0, "Hata")
+        return None
+
+    try:
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = subprocess.CREATE_NO_WINDOW
+
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            creationflags=creationflags,
+            encoding='utf-8',
+            errors='ignore'
+        )
+
+        percentage_pattern = re.compile(r'(\d+)%')
+
+        while True:
+            output_line = process.stdout.readline() or process.stderr.readline()
+            if not output_line and process.poll() is not None:
+                break
+            if output_line:
+                match = percentage_pattern.search(output_line)
+                if match:
+                    try:
+                        progress = int(match.group(1))
+                        root_window.after(0, update_progress_gui, progress, f"Çıkarılıyor: {progress}%")
+                    except ValueError:
+                        pass
+
+        stdout_final, stderr_final = process.communicate() 
+
+        if process.returncode == 0:
+            update_status(f"Arşiv başarıyla çıkarıldı: {os.path.basename(extract_dir)}")
+            root_window.after(0, update_progress_gui, 100, "Çıkarma Tamamlandı!")
+            return temp_archive_path_with_ext
+        else:
+            update_status(f"Hata: Arşiv çıkarılırken bir sorun oluştu. Hata kodu: {process.returncode}")
+            update_status(f"Standart Çıktı: {stdout_final}")
+            update_status(f"Standart Hata: {stderr_final}")
+            root_window.after(0, messagebox.showerror, "Çıkarma Hatası", f"Arşiv çıkarılırken bir sorun oluştu.\nHata kodu: {process.returncode}\nDetaylar konsolda.")
+            root_window.after(0, update_progress_gui, 0, "Çıkarma Hatası")
+            return None
+    except FileNotFoundError:
+        error_msg = f"Hata: '{extraction_tool_path}' bulunamadı. Lütfen aracın kurulu olduğundan ve PATH'inizde olduğundan veya betikteki yolun doğru ayarlandığından emin olun."
+        update_status(error_msg)
+        root_window.after(0, messagebox.showerror, "Çıkarma Aracı Hatası", error_msg)
+        root_window.after(0, update_progress_gui, 0, "Hata")
+        return None
+    except Exception as e:
+        update_status(f"Hata: Arşiv çıkarılırken beklenmeyen bir hata oluştu: {e}")
+        root_window.after(0, messagebox.showerror, "Çıkarma Hatası", f"Arşiv çıkarılırken beklenmeyen bir hata oluştu: {e}")
+        root_window.after(0, update_progress_gui, 0, "Hata")
+        return None
+
+def delete_files(file_paths):
+    """
+    Belirtilen dosya yollarındaki dosyaları siler.
+    Windows'ta gizli olarak işaretlenmiş olsalar bile siler.
+    """
+    for path in file_paths:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                update_status(f"Dosya silindi: {os.path.basename(path)}")
+            else:
+                update_status(f"Dosya bulunamadı, silinemedi: {os.path.basename(path)}")
+        except OSError as e:
+            update_status(f"Hata: Dosya silinirken bir sorun oluştu: {os.path.basename(path)} - {e}")
+
+def filter_games(listbox_widget, search_term):
+    """
+    Oyun listesini arama terimine göre filtreler ve Listbox'ı günceller.
+    filtered_games_for_download global listesini günceller.
+    """
+    global filtered_games_for_download
+    listbox_widget.delete(0, END)
+
+    if not search_term:
+        filtered_games_for_download = list(all_games)
+        for i, game in enumerate(filtered_games_for_download):
+            listbox_widget.insert(END, f"{i+1}. {game['name']} - {game['description']}")
+        update_status("Tüm oyunlar listeleniyor.")
+        return
+
+    matching_games = []
+    search_term_lower = search_term.lower()
+
+    for game in all_games:
+        if search_term_lower in game['name'].lower() or search_term_lower in game['description'].lower():
+            matching_games.append(game)
+
+    filtered_games_for_download = matching_games
+
+    if filtered_games_for_download:
+        for i, game in enumerate(filtered_games_for_download):
+            listbox_widget.insert(END, f"{i+1}. {game['name']} - {game['description']}")
+        update_status(f"'{search_term}' için {len(filtered_games_for_download)} sonuç bulundu.")
+    else:
+        listbox_widget.insert(END, "Eşleşen oyun bulunamadı.")
+        update_status(f"'{search_term}' için hiçbir sonuç bulunamadı.")
+
+def clear_search(listbox_widget, search_entry_widget):
+    """
+    Arama çubuğunu temizler ve tüm oyunları Listbox'a geri yükler.
+    """
+    search_entry_widget.delete(0, END)
+    filter_games(listbox_widget, "")
+    update_status("Arama temizlendi, tüm oyunlar listeleniyor.")
+
+def display_game_details(event, listbox_widget):
+    """
+    Seçilen oyunun detaylarını (açıklama ve resim) günceller.
+    """
+    global game_image_label, current_game_image
+    selected_indices = listbox_widget.curselection()
+    if not selected_indices:
+        # Seçim kaldırıldığında veya boşaltıldığında resmi temizle
+        game_image_label.config(image='')
+        current_game_image = None
+        return
+
+    selected_index = selected_indices[0]
+    if 0 <= selected_index < len(filtered_games_for_download):
+        game = filtered_games_for_download[selected_index]
+        update_status(f"Seçilen Oyun: {game['name']} - {game['description']}")
+        
+        # Resmi yükle (ayrı bir thread'de)
+        if 'image_url' in game and game['image_url']:
+            threading.Thread(target=_load_image_for_display, args=(game['image_url'],)).start()
+        else:
+            game_image_label.config(image='')
+            current_game_image = None # Referansı temizle
+            update_status("Bu oyun için görsel bulunamadı.")
+    else:
+        game_image_label.config(image='')
+        current_game_image = None
+        update_status("Geçersiz oyun seçimi.")
+
+def _load_image_for_display(image_url):
+    """
+    Verilen URL'den resmi indirir, boyutlandırır ve GUI'de görüntüler.
+    Bu fonksiyon ayrı bir thread'de çalışır.
+    """
+    global game_image_label, current_game_image
+    try:
+        update_status(f"Görsel indiriliyor: {image_url}")
+        response = requests.get(image_url, stream=True)
+        response.raise_for_status() # HTTP hataları için istisna fırlat
+
+        image_data = response.content
+        image = Image.open(io.BytesIO(image_data))
+
+        # Resmi boyutlandır (örneğin 300x150 piksel)
+        max_width = 300
+        max_height = 150
+        image.thumbnail((max_width, max_height), Image.LANCZOS) # LANCZOS daha iyi kalite sunar
+
+        photo = ImageTk.PhotoImage(image)
+        # Ana thread'de GUI güncellemesi yap
+        root_window.after(0, _update_game_image_label, photo)
+    except requests.exceptions.RequestException as e:
+        update_status(f"Hata: Görsel indirilemedi: {e}")
+        root_window.after(0, _update_game_image_label, None)
+    except Exception as e:
+        update_status(f"Hata: Görsel işlenirken bir sorun oluştu: {e}")
+        root_window.after(0, _update_game_image_label, None)
+
+def _update_game_image_label(photo):
+    """
+    GUI'deki resim etiketini günceller (ana thread'de çalışır).
+    """
+    global game_image_label, current_game_image
+    current_game_image = photo # Referansı tut, yoksa çöp toplayıcı siler
+    game_image_label.config(image=photo)
+    if photo:
+        game_image_label.config(text="") # Resim varsa metni temizle
+    else:
+        game_image_label.config(text="Görsel Yüklenemedi", fg="red") # Resim yoksa uyarı metni göster
+
+def start_download_for_selected_game_threaded(listbox_widget):
+    """
+    Seçilen oyunu indirip kurma işlemini ayrı bir thread'de başlatır.
+    GUI'yi bloklamaz.
+    """
+    global download_base_directory, WINRAR_PATH, cumulative_downloaded_size, total_game_download_size, filtered_games_for_download
+
+    if not download_base_directory:
+        root_window.after(0, messagebox.showwarning, "Klasör Seçilmedi", "Lütfen önce indirme klasörünü seçin.")
+        return
+    
+    if not WINRAR_PATH:
+        root_window.after(0, messagebox.showwarning, "Arşiv Aracı Yok", "Lütfen devam etmek için WinRAR'ın yolunu belirtin.")
+        return
+
+    selected_indices = listbox_widget.curselection()
+    if not selected_indices:
+        root_window.after(0, messagebox.showwarning, "Seçim Yok", "Lütfen indirmek istediğiniz bir oyun seçin.")
+        return
+
+    selected_index = selected_indices[0]
+    
+    if 0 <= selected_index < len(filtered_games_for_download):
+        game = filtered_games_for_download[selected_index]
+    else:
+        update_status("Hata: Seçilen oyun geçersiz.")
+        root_window.after(0, messagebox.showerror, "Geçersiz Seçim", "Lütfen listeden geçerli bir oyun seçin.")
+        return
+
+    cumulative_downloaded_size[0] = 0
+    total_game_download_size[0] = 0
+
+    if game.get('download_parts'):
+        update_status(f"'{game['name']}' için toplam indirme boyutu hesaplanıyor...")
+        for part_url in game['download_parts']:
+            try:
+                head_response = requests.head(part_url)
+                total_game_download_size[0] += int(head_response.headers.get('content-length', 0))
+            except requests.exceptions.RequestException as e:
+                update_status(f"Uyarı: '{game['name']}' için bir partın boyutu alınamadı: {part_url} - {e}")
+                pass
+        update_status(f"'{game['name']}' için toplam indirme boyutu: {total_game_download_size[0] / (1024*1024):.2f} MB")
+        if total_game_download_size[0] == 0:
+            update_status("Uyarı: Toplam indirme boyutu belirlenemedi. İlerleme göstergesi tam doğru olmayabilir.")
+
+    threading.Thread(target=lambda: download_and_install_game(game, download_base_directory)).start()
+
+
+def download_and_install_game(game, base_dir):
+    """
+    Tek bir oyun için indirme, birleştirme, çıkarma ve silme işlemlerini yönetir.
+    Ayrı bir thread'de çalıştırılmak üzere tasarlanmıştır.
+    """
+    update_status(f"\n--- '{game['name']}' İndirme İşlemi Başlatılıyor ---")
+    game_download_dir = os.path.join(base_dir, game['id'])
+    os.makedirs(game_download_dir, exist_ok=True)
+
+    downloaded_part_paths = []
+    if game.get('download_parts'):
+        total_parts_count = len(game['download_parts'])
+        for i, part_url in enumerate(game['download_parts']):
+            part_filename_temp = f"{game['id']}_part_{i+1:03d}_temp"
+            part_filepath = os.path.join(game_download_dir, part_filename_temp)
+            
+            if download_file(part_url, part_filepath, game['name'], i + 1, total_parts_count):
+                downloaded_part_paths.append(part_filepath)
+                if sys.platform == "win32":
+                    try:
+                        subprocess.run(['attrib', '+H', part_filepath], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                        update_status(f"'{os.path.basename(part_filepath)}' dosyası gizlendi.")
+                        time.sleep(0.05)
+                    except Exception as e:
+                        update_status(f"Uyarı: '{os.path.basename(part_filepath)}' gizlenirken hata oluştu: {e}")
+            else:
+                update_status(f"Hata: '{game['name']}' için part {i+1} indirilemedi. İşlem durduruluyor.")
+                root_window.after(0, messagebox.showerror, "İndirme Hatası", f"'{game['name']}' için part {i+1} indirilemedi.")
+                delete_files(downloaded_part_paths)
+                return
+    else:
+        update_status(f"'{game['name']}' için indirme parçaları bulunamadı.")
+        root_window.after(0, messagebox.showinfo, "Bilgi", f"'{game['name']}' için indirme parçaları bulunamadı.")
+        return
+
+    if len(downloaded_part_paths) == len(game.get('download_parts', [])):
+        merged_archive_path_no_ext = merge_parts(game_download_dir, game, downloaded_part_paths)
+        
+        if merged_archive_path_no_ext:
+            extract_target_dir = game_download_dir
+            os.makedirs(extract_target_dir, exist_ok=True)
+            
+            extracted_archive_path_to_delete = extract_archive(merged_archive_path_no_ext, extract_target_dir, game.get('archive_type'))
+            
+            if extracted_archive_path_to_delete:
+                update_status(f"'{game['name']}' başarıyla kuruldu.")
+                root_window.after(0, messagebox.showinfo, "Kurulum Tamamlandı", f"'{game['name']}' başarıyla kuruldu.")
+                
+                files_to_delete = downloaded_part_paths + [extracted_archive_path_to_delete]
+                delete_files(files_to_delete)
+            else:
+                update_status(f"'{game['name']}' çıkarılamadı. Manuel olarak kontrol edin.")
+                root_window.after(0, messagebox.showerror, "Kurulum Hatası", f"'{game['name']}' çıkarılamadı. Manuel olarak kontrol edin.")
+                files_to_delete = downloaded_part_paths + [merged_archive_path_no_ext]
+                delete_files(files_to_delete)
+        else:
+            update_status(f"'{game['name']}' için arşiv birleştirilemedi.")
+            root_window.after(0, messagebox.showerror, "Birleştirme Hatası", f"'{game['name']}' için arşiv birleştirilemedi.")
+            delete_files(downloaded_part_paths)
+    else:
+        update_status(f"'{game['name']}' için tüm parçalar indirilemedi, birleştirme ve çıkarma atlanıyor.")
+        root_window.after(0, messagebox.showerror, "İndirme Hatası", f"'{game['name']}' için tüm parçalar indirilemedi.")
+        delete_files(downloaded_part_paths)
+
+    update_status(f"--- '{game['name']}' İşlemi Tamamlandı ---")
+
+def prompt_for_winrar_path():
+    """Kullanıcıdan WinRAR yürütülebilir dosyasının yolunu manuel olarak seçmesini ister."""
+    global WINRAR_PATH, download_button_widget, manual_winrar_button_widget
+    path = filedialog.askopenfilename(
+        title="WinRAR (WinRAR.exe veya Rar.exe) dosyasını seçin",
+        filetypes=[("Executable files", "*.exe"), ("All files", "*.*")]
+    )
+    if path:
+        WINRAR_PATH = path
+        update_status(f"WinRAR yolu manuel olarak ayarlandı: {WINRAR_PATH}")
+        if download_button_widget and download_button_widget['state'] == 'disabled':
+            download_button_widget.config(state="normal")
+        if manual_winrar_button_widget:
+            manual_winrar_button_widget.pack_forget()
+
+def main():
+    """
+    Uygulamanın ana akışını çalıştırır ve GUI'yi oluşturur.
+    """
+    global all_games, status_text_widget, root_window, download_base_directory, progress_bar_widget, progress_label_widget, WINRAR_PATH, download_button_widget, manual_winrar_button_widget, filtered_games_for_download, game_image_label
+
+    root_window = Tk()
+    root_window.title("Basit Oyun İndirici")
+    root_window.geometry("1024x768")
+    root_window.configure(bg="#1a1a2e")
+
+    style = ttk.Style()
+    style.theme_use('clam')
+
+    style.configure("Custom.Horizontal.TProgressbar",
+                    background="#0f3460",
+                    troughcolor="#555555",
+                    bordercolor="#0f3460",
+                    lightcolor="#0f3460",
+                    darkcolor="#0f3460")
+    style.layout("Custom.Horizontal.TProgressbar",
+                 [('progressbar', {'children': [('normallength', {'children': [('bar', {'sticky': 'nswe'})]})],
+                                     'sticky': 'nswe'})])
+
+    main_frame = Frame(root_window, padx=20, pady=20, bg="#1a1a2e")
+    main_frame.pack(fill="both", expand=True)
+
+    title_label = Label(main_frame, text="Basit Oyun İndirici", font=("Montserrat", 48, "bold"), fg="#e94560", bg="#1a1a2e")
+    title_label.pack(pady=20)
+
+    status_frame = Frame(main_frame, bg="#34495e", bd=2, relief="flat", highlightbackground="#0f3460", highlightthickness=2)
+    status_frame.pack(fill="both", expand=True, pady=15, padx=10)
+    
+    status_text_widget = Text(status_frame, height=6, wrap="word", state="disabled", font=("Roboto Mono", 12), bg="#22223b", fg="#e0e0e0", relief="flat", bd=0)
+    status_text_widget.pack(fill="both", expand=True, padx=10, pady=10)
+    
+    status_scrollbar = Scrollbar(status_text_widget, command=status_text_widget.yview, troughcolor="#22223b", bg="#555555", activebackground="#777777")
+    status_scrollbar.pack(side="right", fill="y")
+    status_text_widget.config(yscrollcommand=status_scrollbar.set)
+
+    progress_frame = Frame(main_frame, bg="#1a1a2e")
+    progress_frame.pack(fill="x", pady=15, padx=10)
+
+    progress_label_widget = Label(progress_frame, text="0%", font=("Montserrat", 18, "bold"), fg="#e94560", bg="#1a1a2e")
+    progress_label_widget.pack(side="left", padx=10)
+
+    progress_bar_widget = ttk.Progressbar(progress_frame, orient="horizontal", length=400, mode="determinate", style="Custom.Horizontal.TProgressbar")
+    progress_bar_widget.pack(side="left", fill="x", expand=True, padx=10)
+    
+    search_frame = Frame(main_frame, bg="#1a1a2e")
+    search_frame.pack(fill="x", pady=10, padx=10)
+
+    search_label = Label(search_frame, text="Oyun Ara:", font=("Montserrat", 16, "bold"), fg="#e94560", bg="#1a1a2e")
+    search_label.pack(side="left", padx=5)
+
+    search_entry = ttk.Entry(search_frame, font=("Roboto", 14), width=40)
+    search_entry.pack(side="left", fill="x", expand=True, padx=5)
+    search_entry.bind("<Return>", lambda event: filter_games(games_listbox, search_entry.get()))
+
+    search_button = Button(
+        search_frame,
+        text="Ara",
+        command=lambda: filter_games(games_listbox, search_entry.get()),
+        font=("Montserrat", 12, "bold"),
+        bg="#0f3460", fg="white",
+        activebackground="#1e2a5c",
+        relief="flat", bd=0, padx=15, pady=5, cursor="hand2"
+    )
+    search_button.pack(side="left", padx=5)
+
+    clear_search_button = Button(
+        search_frame,
+        text="Temizle",
+        command=lambda: clear_search(games_listbox, search_entry),
+        font=("Montserrat", 12, "bold"),
+        bg="#555555", fg="white",
+        activebackground="#444444",
+        relief="flat", bd=0, padx=15, pady=5, cursor="hand2"
+    )
+    clear_search_button.pack(side="left", padx=5)
+
+    # Yeni çerçeve: Oyun listesi ve detayları için (yan yana)
+    game_display_frame = Frame(main_frame, bg="#1a1a2e")
+    game_display_frame.pack(fill="both", expand=True, pady=15, padx=10)
+
+    # Sol kısım: Oyun listesi
+    game_list_frame = Frame(game_display_frame, bg="#34495e", bd=2, relief="flat", highlightbackground="#0f3460", highlightthickness=2)
+    game_list_frame.pack(side="left", fill="both", expand=True, padx=(0, 10)) # Sağa boşluk eklendi
+
+    game_list_label = Label(game_list_frame, text="Mevcut Oyunlar:", anchor="w", font=("Montserrat", 16, "bold"), fg="#e94560", bg="#34495e")
+    game_list_label.pack(side="top", fill="x", padx=10, pady=5)
+
+    listbox_scrollbar = Scrollbar(game_list_frame, troughcolor="#34495e", bg="#555555", activebackground="#777777")
+    listbox_scrollbar.pack(side="right", fill="y")
+
+    games_listbox = Listbox(
+        game_list_frame,
+        selectmode="single",
+        yscrollcommand=listbox_scrollbar.set,
+        font=("Roboto", 14),
+        height=5,
+        bg="#22223b", fg="#a0a0a0",
+        selectbackground="#0f3460", selectforeground="white",
+        bd=0, relief="flat",
+        highlightthickness=0,
+        activestyle="none"
+    )
+    games_listbox.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+    listbox_scrollbar.config(command=games_listbox.yview)
+
+    # Listbox'ta bir seçim olduğunda display_game_details fonksiyonunu çağır
+    games_listbox.bind("<<ListboxSelect>>", lambda event: display_game_details(event, games_listbox))
+
+    # Sağ kısım: Oyun detayları ve resim
+    game_details_frame = Frame(game_display_frame, bg="#34495e", bd=2, relief="flat", highlightbackground="#0f3460", highlightthickness=2)
+    game_details_frame.pack(side="right", fill="both", expand=False, padx=(10, 0)) # Sola boşluk eklendi
+
+    details_label = Label(game_details_frame, text="Oyun Detayları:", anchor="w", font=("Montserrat", 16, "bold"), fg="#e94560", bg="#34495e")
+    details_label.pack(side="top", fill="x", padx=10, pady=5)
+
+    # Oyun resmini göstermek için Label
+    game_image_label = Label(game_details_frame, bg="#22223b", text="Resim Yok", fg="#a0a0a0", font=("Roboto", 12))
+    game_image_label.pack(padx=10, pady=10, fill="both", expand=True)
+    
+    # Oyun açıklamasını göstermek için Text widget'ı (sadece okunabilir)
+    game_description_text = Text(game_details_frame, height=5, wrap="word", state="disabled", font=("Roboto Mono", 12), bg="#22223b", fg="#e0e0e0", relief="flat", bd=0)
+    game_description_text.pack(padx=10, pady=(0, 10), fill="x", expand=False) # Padding ayarı
+
+    # Oyunları yükle ve listbox'a ekle
+    all_games = fetch_games(JSON_URL)
+    if all_games:
+        filtered_games_for_download = list(all_games)
+        for i, game in enumerate(all_games):
+            games_listbox.insert(END, f"{i+1}. {game['name']} - {game['description']}")
+        update_status("Oyunlar başarıyla yüklendi.")
+    else:
+        update_status("Oyunlar yüklenemedi. Lütfen konsol çıktısını kontrol edin.")
+        messagebox.showerror("Yükleme Hatası", "Oyunlar yüklenemedi. Lütfen konsol çıktısını kontrol edin.")
+
+    # WinRAR yolunu bul (sessizce)
+    global WINRAR_PATH
+    if sys.platform == "win32":
+        WINRAR_PATH = find_executable("WinRAR.exe")
+        if not WINRAR_PATH:
+            WINRAR_PATH = find_executable("Rar.exe")
+    else:
+        WINRAR_PATH = find_executable("rar")
+        if not WINRAR_PATH:
+            WINRAR_PATH = find_executable("unrar")
+
+    button_frame = Frame(main_frame, bg="#1a1a2e")
+    button_frame.pack(pady=20)
+
+    select_dir_button = Button(
+        button_frame,
+        text="İndirme Klasörünü Seç",
+        command=select_download_directory_gui,
+        font=("Montserrat", 14, "bold"),
+        bg="#0f3460", fg="white",
+        activebackground="#1e2a5c",
+        relief="flat",
+        bd=0,
+        padx=20, pady=10,
+        cursor="hand2",
+        highlightbackground="#0f3460", highlightthickness=2
+    )
+    select_dir_button.pack(side="left", padx=10)
+
+    download_button_widget = Button(
+        button_frame,
+        text="Seçili Oyunu İndir ve Kur",
+        command=lambda: start_download_for_selected_game_threaded(games_listbox),
+        font=("Montserrat", 18, "bold"),
+        bg="#e94560", fg="white",
+        activebackground="#c9364f",
+        relief="flat",
+        bd=0,
+        padx=30, pady=15,
+        cursor="hand2",
+        highlightbackground="#e94560", highlightthickness=2
+    )
+    download_button_widget.pack(side="left", padx=10)
+
+    if not WINRAR_PATH:
+        download_button_widget.config(state="disabled")
+        manual_winrar_button_widget = Button(
+            button_frame,
+            text="WinRAR Yolunu Seç",
+            command=prompt_for_winrar_path,
+            font=("Montserrat", 12, "bold"),
+            bg="#555555", fg="white",
+            activebackground="#444444",
+            relief="flat", bd=0, padx=15, pady=8, cursor="hand2",
+            highlightbackground="#555555", highlightthickness=2
+        )
+        manual_winrar_button_widget.pack(side="left", padx=10)
+        update_status("Kritik Uyarı: WinRAR otomatik olarak bulunamadı. Lütfen manuel olarak seçin.")
+    else:
+        update_status(f"WinRAR yolu otomatik olarak bulundu: {WINRAR_PATH}")
+
+    exit_button = Button(
+        main_frame,
+        text="Uygulamadan Çık",
+        command=root_window.quit,
+        font=("Montserrat", 12, "bold"),
+        bg="#882222", fg="white",
+        activebackground="#661a1a",
+        relief="flat", bd=0, padx=15, pady=8, cursor="hand2",
+        highlightbackground="#882222", highlightthickness=2
+    )
+    exit_button.pack(side="bottom", pady=20)
+
+    root_window.mainloop()
+
+if __name__ == "__main__":
+    import io # io modülü eklendi
+    main()
