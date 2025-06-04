@@ -74,5 +74,18 @@
     "executable_name": "GTA.exe",
     "archive_type": "zip",
     "play_action": "https://www.tamindir.com/indir/grand-theft-auto/"
+  },
+  {
+    "id": "Grand Theft Auto Vice City",
+    "name": "Grand Theft Auto Vice City",
+    "description": "4107.47 MB",
+    "download_parts": [
+      "https://gamebuild.launcher.xsolla.com/20589/full_games/full_game_/full_game_655fb619e081b552426793c6a2d46c8c_.7z.001",
+      "https://gamebuild.launcher.xsolla.com/20589/full_games/full_game_/full_game_655fb619e081b552426793c6a2d46c8c_.7z.002",
+      "https://gamebuild.launcher.xsolla.com/20589/full_games/full_game_/full_game_655fb619e081b552426793c6a2d46c8c_.7z.003"
+    ],
+    "executable_name": "GTA.exe",
+    "archive_type": "zip",
+    "play_action": "https://www.tamindir.com/indir/grand-theft-auto/"
   }
 ]
