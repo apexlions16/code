@@ -249,18 +249,9 @@
   ],
   "archive_type": "7z",
   "image_url": "https://www.google.com/url?sa=E&source=gmail&q=https://cdn.akamai.steamstatic.com/steam/apps/1290000/header.jpg"
-  },
-  {
-  "id": "Grand Theft Auto",
-  "name": "Grand Theft Auto",
-  "description": "622 MB",
-  "download_parts": [
-    "https://gamebuild.launcher.xsolla.com/17896/full_games/full_game_/full_game_35f7dddd15bfbdbbf422c86e14f88dca_.7z.001"
-  ],
-  "archive_type": "7z",
-  "image_url": "https://cdn.akamai.steamstatic.com/steam/apps/271590/header.jpg"
- }
+  }
 ]
+
 
 
 
