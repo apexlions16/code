@@ -179,5 +179,17 @@
     "executable_name": "GTA.exe",
     "archive_type": "zip",
     "play_action": "https://www.tamindir.com/indir/grand-theft-auto/"
+  },
+    {
+    "id": "My Child Lebensborn",
+    "name": "My Child Lebensborn",
+    "description": "Boyut Bilinmiyor",
+    "download_parts": [
+      "https://gamebuild.launcher.xsolla.com/17882/full_games/full_game_/full_game_70cfb1c6d85a511963e68750df76a02c_.7z.001"
+    ],
+    "executable_name": "MyChildLebensborn.exe",
+    "archive_type": "7z",
+    "play_action": "https://store.steampowered.com/app/840820/My_Child_Lebensborn/"
   }
 ]
+
