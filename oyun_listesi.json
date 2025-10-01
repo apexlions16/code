@@ -183,7 +183,7 @@
     {
     "id": "My Child Lebensborn",
     "name": "My Child Lebensborn",
-    "description": "Boyut Bilinmiyor",
+    "description": "1.49GB",
     "download_parts": [
       "https://gamebuild.launcher.xsolla.com/17882/full_games/full_game_/full_game_70cfb1c6d85a511963e68750df76a02c_.7z.001"
     ],
@@ -192,4 +192,5 @@
     "play_action": "https://store.steampowered.com/app/840820/My_Child_Lebensborn/"
   }
 ]
+
 
