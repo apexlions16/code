@@ -201,5 +201,17 @@
     "executable_name": "Stardew Valley.exe",
     "archive_type": "7z",
     "play_action": "https://store.steampowered.com/app/413150/Stardew_Valley/"
+  },
+  {
+    "id": "Hitman: Contracts",
+    "name": "Hitman: Contracts",
+    "description": "575 MB",
+    "download_parts": [
+      "https://gamebuild.launcher.xsolla.com/17887/full_games/full_game_/full_game_be678af65e85b795a8b4f13c79b545a2_.7z.001"
+    ],
+    "executable_name": "hitmancontracts.exe",
+    "archive_type": "7z",
+    "play_action": "https://store.steampowered.com/app/247430/Hitman_Contracts/"
   }
 ]
+
