@@ -212,6 +212,18 @@
     "executable_name": "hitmancontracts.exe",
     "archive_type": "7z",
     "play_action": "https://store.steampowered.com/app/247430/Hitman_Contracts/"
+  },
+  {
+    "id": "- R E F L E C T E D -",
+    "name": "- R E F L E C T E D -",
+    "description": "150 MB",
+    "download_parts": [
+      "https://gamebuild.launcher.xsolla.com/17888/full_games/full_game_/full_game_482401b4c7a84fc0d2df4f2eaa43da68_.7z.001"
+    ],
+    "executable_name": "reflected.exe",
+    "archive_type": "7z",
+    "play_action": "https://www.google.com/search?q=REFLECTED+game"
   }
 ]
+
 
