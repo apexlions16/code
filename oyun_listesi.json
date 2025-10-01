@@ -190,7 +190,7 @@
     "executable_name": "MyChildLebensborn.exe",
     "archive_type": "7z",
     "play_action": "https://store.steampowered.com/app/840820/My_Child_Lebensborn/"
-  }
+  },
 {
     "id": "Stardew Valley",
     "name": "Stardew Valley",
@@ -203,6 +203,7 @@
     "play_action": "https://store.steampowered.com/app/413150/Stardew_Valley/"
   }
 ]
+
 
 
 
