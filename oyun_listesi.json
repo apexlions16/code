@@ -10,6 +10,7 @@
     "executable_name": "PapersPlease.exe",
     "archive_type": "rar",
     "play_action": "https://store.steampowered.com/app/239030/Papers_Please/"
+    "image_url": "https://cdn2.steamgriddb.com/logo_thumb/751e262f065a17a3d0294b36c9a1427d.png"
   },
   {
     "id": "Grand Theft Auto 1",
@@ -586,6 +587,7 @@
     "play_action": "https://www.google.com/search?q=Mount+&+Blade+:+Warband"
   }
 ]
+
 
 
 
