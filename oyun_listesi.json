@@ -310,8 +310,21 @@
     "executable_name": "GTAIV.exe",
     "archive_type": "7z",
     "play_action": "https://www.google.com/search?q=GTA+IV"
+  },
+  {
+    "id": "NEEDY GIRL OVERDOOSE",
+    "name": "NEEDY GIRL OVERDOOSE",
+    "description": "2.29 GB",
+    "download_parts": [
+      "https://gamebuild.launcher.xsolla.com/17908/full_games/full_game_/full_game_21b6631f005efc0cba75684b80368144_.7z.001",
+      "https://gamebuild.launcher.xsolla.com/17908/full_games/full_game_/full_game_21b6631f005efc0cba75684b80368144_.7z.002"
+    ],
+    "executable_name": "needygirloverdoose.exe",
+    "archive_type": "7z",
+    "play_action": "https://www.google.com/search?q=NEEDY+GIRL+OVERDOOSE"
   }
 ]
+
 
 
 
